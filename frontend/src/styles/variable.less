@@ -1,0 +1,172 @@
+// =============================================================
+//  轻享瘦 · 设计系统  ——  「运动能量 · 暗夜工业」
+//  深空墨底 + 电光青柠强调 + 等宽数字 + 发丝网格
+//  默认深色；保留 --color-* 旧别名兼容
+// =============================================================
+
+// ---------- 字体 ----------
+@font-display: 'Chakra Petch', 'Bahnschrift', 'DIN Alternate', 'PingFang SC',
+  'Microsoft YaHei', sans-serif;
+@font-body: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'PingFang SC',
+  'Microsoft YaHei', 'Segoe UI', Roboto, sans-serif;
+@font-mono: 'JetBrains Mono', 'Cascadia Mono', 'Consolas', ui-monospace, 'Courier New',
+  monospace;
+
+// ---------- 布局尺寸 ----------
+@rail-w: 78px; // 侧栏折叠宽度
+@rail-w-open: 240px; // 侧栏展开宽度
+@topbar-h: 58px;
+@content-max: 1320px;
+
+// ---------- 圆角 ----------
+@r-sm: 6px;
+@r-md: 10px;
+@r-lg: 16px;
+@r-xl: 22px;
+
+// ---------- 动效 ----------
+@ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+@ease: cubic-bezier(0.4, 0, 0.2, 1);
+@dur-fast: 160ms;
+@dur: 320ms;
+@dur-slow: 640ms;
+
+// ---------- 强调色（跨主题恒定） ----------
+@lime: #c6f24e;
+@lime-2: #aade33;
+@on-lime: #0a0c10;
+
+// =============================================================
+//  主题令牌
+// =============================================================
+
+// 深色（默认）
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0a0c10;
+  --bg-2: #0e1117;
+  --surface: #141922;
+  --surface-2: #1b212c;
+  --hover: #222a38;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-2: rgba(255, 255, 255, 0.16);
+
+  --text-1: #eaf1f7;
+  --text-2: #95a3b1;
+  --text-3: #5e6b79;
+
+  --lime: @lime;
+  --lime-2: @lime-2;
+  --lime-ink: #c6f24e;
+  --on-lime: @on-lime;
+  --lime-soft: rgba(198, 242, 78, 0.12);
+  --orange: #ff7a2f;
+  --orange-soft: rgba(255, 122, 47, 0.14);
+  --cyan: #35e0ff;
+  --cyan-soft: rgba(53, 224, 255, 0.14);
+  --violet: #9c8bff;
+  --red: #ff5252;
+  --red-soft: rgba(255, 82, 82, 0.14);
+  --green: #3fe08a;
+
+  --grid-line: rgba(255, 255, 255, 0.035);
+  --grain-opacity: 0.05;
+
+  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.45);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --shadow-3: 0 26px 70px rgba(0, 0, 0, 0.65);
+  --glow-lime: 0 8px 30px rgba(198, 242, 78, 0.22);
+
+  --topbar-bg: rgba(10, 12, 16, 0.72);
+  --topbar-border: rgba(255, 255, 255, 0.08);
+  --rail-bg: #0d1016;
+  --rail-border: rgba(255, 255, 255, 0.08);
+
+  // 旧别名兼容
+  --color-primary: var(--lime);
+  --color-primary-dark: var(--lime-2);
+  --color-secondary: var(--orange);
+  --color-blue: var(--cyan);
+  --color-bg: var(--bg);
+  --color-bg-card: var(--surface);
+  --color-text: var(--text-1);
+  --color-text-secondary: var(--text-2);
+  --color-border: var(--border);
+  --color-danger: var(--red);
+  --color-success: var(--green);
+  --color-warning: var(--orange);
+  --shadow-card: var(--shadow-1);
+  --nav-bar-bg: rgba(14, 17, 23, 0.9);
+  --nav-bar-text: #eaf1f7;
+  --tabbar-bg: rgba(10, 12, 16, 0.94);
+  --tabbar-text: #5e6b79;
+  --tabbar-active: var(--lime);
+}
+
+// 浅色（工业浅色：冷灰底 + 深青柠字 + 亮青柠填充）
+[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #eef1f4;
+  --bg-2: #e7ebef;
+  --surface: #ffffff;
+  --surface-2: #f5f7f9;
+  --hover: #edf0f3;
+
+  --border: rgba(15, 23, 32, 0.1);
+  --border-2: rgba(15, 23, 32, 0.2);
+
+  --text-1: #0d131a;
+  --text-2: #4b5763;
+  --text-3: #8a96a3;
+
+  --lime: #a8d91f;
+  --lime-2: #8fb800;
+  --lime-ink: #557a00;
+  --on-lime: #0a0c10;
+  --lime-soft: rgba(140, 185, 10, 0.16);
+  --orange: #e4681c;
+  --orange-soft: rgba(228, 104, 28, 0.14);
+  --cyan: #0e93b3;
+  --cyan-soft: rgba(14, 147, 179, 0.14);
+  --violet: #6e5be0;
+  --red: #e23d3d;
+  --red-soft: rgba(226, 61, 61, 0.12);
+  --green: #0f9d58;
+
+  --grid-line: rgba(15, 23, 32, 0.045);
+  --grain-opacity: 0.035;
+
+  --shadow-1: 0 1px 2px rgba(15, 23, 32, 0.06), 0 2px 8px rgba(15, 23, 32, 0.06);
+  --shadow-2: 0 10px 28px rgba(15, 23, 32, 0.1);
+  --shadow-3: 0 24px 60px rgba(15, 23, 32, 0.14);
+  --glow-lime: 0 8px 24px rgba(140, 185, 10, 0.25);
+
+  --topbar-bg: rgba(255, 255, 255, 0.82);
+  --topbar-border: rgba(15, 23, 32, 0.1);
+  // 侧栏 / 页头必须跟随主题派生，禁止写死深色
+  --rail-bg: #f7f9fb;
+  --rail-border: rgba(15, 23, 32, 0.1);
+
+  --color-primary: var(--lime-ink);
+  --color-primary-dark: var(--lime-2);
+  --color-secondary: var(--orange);
+  --color-blue: var(--cyan);
+  --color-bg: var(--bg);
+  --color-bg-card: var(--surface);
+  --color-text: var(--text-1);
+  --color-text-secondary: var(--text-2);
+  --color-border: var(--border);
+  --color-danger: var(--red);
+  --color-success: var(--green);
+  --color-warning: var(--orange);
+  --shadow-card: var(--shadow-1);
+  --nav-bar-bg: rgba(255, 255, 255, 0.9);
+  --nav-bar-text: #0d131a;
+  --tabbar-bg: rgba(255, 255, 255, 0.94);
+  --tabbar-text: #8a96a3;
+  --tabbar-active: var(--lime-ink);
+}

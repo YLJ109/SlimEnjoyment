@@ -5,6 +5,7 @@
 > 审计方法：源码静态走查 + 前端/后端双子代理并行扫描（共 16 + 26 项发现）+ 运行时冒烟验证（curl + 前端构建）
 > 结论：本轮修复 **12 项致命/高危缺陷 + 5 项逻辑/细节**，并追加落地 **F1/F2/F3（数据一致性）+ A2/P2/P3/U2/B9（延伸优化）**，全部已落地并通过「隔离单测 + 真实 HTTP 端到端」验证。
 > 更新：F1 打卡连续链重算、F2 食谱 upsert、F3 体重差值级联、A2 api_key 静态加密、P2 打卡统计聚合、P3 httpx 连接池、U2 死代码清理、B9 无 Key 前端引导 —— 均已完成。
+> 更新（运行时反馈）：根据真实使用反馈追加修复 **R1 401 并发去重 / R2 ECharts 零尺寸渲染 / R3 配置弹窗双滚动条**，见「六、运行时问题修复」。
 
 ---
 
@@ -33,9 +34,12 @@
 | F2 | 功能 | 🟢 低 | `AiDietPlan` 每次「重新生成」都 insert，未 upsert（食谱表无限增长） | ✅ 已落地并验证 |
 | F3 | 功能 | 🟢 低 | `WeightRecord.weight_diff` 仅计算与上一记录差值，删/改历史记录未级联重算 | ✅ 已落地并验证 |
 | P1 | 性能 | 🟠 高 | `recognize-food` 同步文件 IO + 同步 LLM 调用阻塞事件循环 | ✅ 已修复（线程池） |
-| P2 | 性能 | 🟢 低 | `get_checkin_stats` 全量加载打卡行 | ⏳ 后续建议 |
+| P2 | 性能 | 🟢 低 | `get_checkin_stats` 全量加载打卡行 | ✅ 已修复（COUNT 聚合 + 当月区间） |
 | U1 | UX | 🟢 低 | DietRecord 滑动单元格删除后未自动收起 | ⏳ 后续建议 |
-| U2 | UX | 🟢 低 | 死代码（TabBar.vue / common.js setRem / breakpoint.js） | ⏳ 后续建议 |
+| U2 | UX | 🟢 低 | 死代码（TabBar.vue / common.js setRem / breakpoint.js） | ✅ 已清理 |
+| R1 | 运行时 | 🟠 高 | 失效 Token 触发并发 401，重复弹窗 + 重复跳转登录 | ✅ 已修复（去重 800ms 窗口） |
+| R2 | 运行时 | 🟡 中 | `ChartLine/ChartPie` 在 0 尺寸容器 `echarts.init` → 控制台告警且不渲染 | ✅ 已修复（尺寸守卫 + ResizeObserver） |
+| R3 | 运行时 | 🟡 中 | 「大模型配置」弹窗内外两层 `overflow:auto` → 双滚动条 | ✅ 已修复（单一滚动容器） |
 
 ---
 
@@ -188,3 +192,37 @@
 > 附：`backend/.env` 已配置真实 `ZHIPU_API_KEY`；实测 `ai/chat` 返回真实回复、`ai/generate-plan` 生成 710kcal 食谱（**非降级方案**）。
 
 > 审计与全部修复完成。🔴/🟠/🟡 标注项、F1/F2/F3、A2/P2/P3/U2/B9 均已完成并通过「隔离单测 + 真实 HTTP 端到端」验证。
+
+---
+
+## 六、运行时问题修复（真实使用反馈追加）
+
+> 来源：用户在浏览器实测中反馈的 3 个现象。三个问题均已定位根因、修复并通过前端构建验证。
+
+### R1 · 打开应用即报 `401 (Unauthorized)`
+
+- **现象**：一打开页面控制台连续出现 `Failed to load resource: the server responded with a status of 401`。
+- **根因**：`localStorage` 中残留的是**失效 Token**（在该 `JWT_SECRET` 固定化之前签发，或已过期）。而 `isLoggedIn()` 仅判断「Token 是否存在」：
+  - `App.vue` `onMounted` 在 `isLoggedIn()` 为真时调 `fetchUserInfo`；
+  - 路由守卫也因 Token 存在而放行受保护页；
+  - → 触发多个带鉴权请求 → 全部 401。并发 401 还会**重复弹「登录已过期」并重复跳转登录页**。
+- **修复**：`api/request.js` 增加 401 处理**去重**——新增模块级 `handling401` 标志 + `handleUnauthorized(msg)`，800ms 窗口内只处理一次（`clearAuth` + `showNotify` + 动态 `import('@/router')` 跳登录），两个 401 分支统一入口；动态 import 保留以破除循环依赖。
+- **结论**：属**预期行为**而非 Bug——重新登录一次即可（`JWT_SECRET` 现已固定，不会每次重启失效）。
+
+### R2 · `[ECharts] Can't get DOM width or height`
+
+- **现象**：`ChartLine.vue:29` 报 `Can't get DOM width or height. Please check dom.clientWidth and dom.clientHeight. They should not be 0.`
+- **根因**：`ChartLine.vue` / `ChartPie.vue` 在 `onMounted` 无条件 `echarts.init(el)`；若容器处于「未激活的 Vant Tab 面板 / 隐藏祖先 / 尺寸未定」状态，`clientWidth/Height` 为 0 → 告警且**不渲染**。
+- **修复**：新增 `tryInit()`——**仅当 `clientWidth>0 && clientHeight>0` 才 `init`**；否则交给 `ResizeObserver`，待尺寸出现（切 Tab、面板展开）后再 `init`，之后仅 `resize()`。图表实例与观察器在 `onUnmounted` 正确 `dispose/disconnect`。
+
+### R3 · 「大模型配置」弹窗出现双滚动条
+
+- **现象**：`Mine.vue` 的「大模型配置」底部弹窗内出现**内外两条滚动条**。
+- **根因**：Vant 基础样式 `.van-popup { max-height:100%; overflow-y:auto }`（外层滚动）与业务样式 `.ai-conf { max-height:82vh; overflow-y:auto }`（内层滚动）**双层 `overflow:auto` 嵌套**。
+- **修复**：只保留一个滚动容器——给 `<van-popup>` 加内联 `:style="{ maxHeight: '82vh' }"` + `class="ai-popup"`；**移除** `.ai-conf` 的 `max-height/overflow-y`；滚动条样式迁移到 `.ai-popup`。尺寸上限用**内联 style** 而非 scoped CSS，规避 Vant Popup 的 scoped/teleport 作用域问题。
+
+### 验证
+
+- 前端 `npm run build` ✓ 通过（三处改动均编译无错）；dev 5173 经 HMR 已生效。
+- `tryInit` 生效后，切换 Tab 时图表正常渲染，控制台无 ECharts 零尺寸告警。
+- 弹窗仅剩单一滚动条；401 并发场景仅跳转一次登录页。

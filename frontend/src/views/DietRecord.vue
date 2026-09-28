@@ -64,10 +64,10 @@
             <van-field name="meal_type" label="餐次">
               <template #input>
                 <van-radio-group v-model="textForm.meal_type" direction="horizontal">
-                  <van-radio name="breakfast">早</van-radio>
-                  <van-radio name="lunch">午</van-radio>
-                  <van-radio name="dinner">晚</van-radio>
-                  <van-radio name="snack">加餐</van-radio>
+                  <van-radio :name="1">早</van-radio>
+                  <van-radio :name="2">午</van-radio>
+                  <van-radio :name="3">晚</van-radio>
+                  <van-radio :name="4">加餐</van-radio>
                 </van-radio-group>
               </template>
             </van-field>
@@ -99,10 +99,34 @@
           <van-loading size="18px" /> 正在识别食物...
         </div>
         <template v-else>
+          <van-field label="餐次">
+            <template #input>
+              <van-radio-group v-model="recMealType" direction="horizontal">
+                <van-radio :name="1">早</van-radio>
+                <van-radio :name="2">午</van-radio>
+                <van-radio :name="3">晚</van-radio>
+                <van-radio :name="4">加餐</van-radio>
+              </van-radio-group>
+            </template>
+          </van-field>
+          <div class="rec-count">共识别到 {{ recognizedList.length }} 项</div>
           <div class="rec-list">
             <div class="rec-item" v-for="(f, i) in recognizedList" :key="i">
-              <van-field v-model="f.name" label="名称" />
+              <div class="rec-head">
+                <span class="rec-idx">#{{ i + 1 }}</span>
+                <van-field v-model="f.name" label="名称" />
+                <button
+                  v-if="recognizedList.length > 1"
+                  class="rec-del"
+                  type="button"
+                  aria-label="移除该项"
+                  @click="recognizedList.splice(i, 1)"
+                >
+                  <AppIcon name="trash" :size="16" />
+                </button>
+              </div>
               <div class="rec-grid">
+                <van-field v-model="f.quantity" type="digit" label="数量" placeholder="1" />
                 <van-field v-model="f.weight" type="digit" label="重量(g)" />
                 <van-field v-model="f.calorie" type="digit" label="热量" />
                 <van-field v-model="f.protein" type="digit" label="蛋白(g)" />
@@ -161,7 +185,7 @@ import { listDiet, addDiet, updateDiet, deleteDiet } from '@/api/diet'
 import { recognizeFood } from '@/api/ai'
 import { showToast, showLoadingToast, closeToast, showConfirmDialog } from 'vant'
 import { formatDate, today } from '@/utils/format'
-import { MEAL_TYPE_MAP } from '@/utils/common'
+import { compressImage } from '@/utils/image'
 
 const recordDate = ref(today())
 const refreshing = ref(false)
@@ -177,9 +201,11 @@ const showRecognize = ref(false)
 const showEdit = ref(false)
 const recognizing = ref(false)
 const fileInput = ref(null)
-const recMealType = ref('lunch')
+const recMealType = ref(2)
 
 const recognizedList = ref([])
+// 识别结果对应的图片 URL（随记录一并保存，便于在列表显示缩略图）
+const recImageUrl = ref('')
 const editItem = ref(null)
 
 const actionList = [
@@ -188,7 +214,7 @@ const actionList = [
 ]
 
 const textForm = reactive({
-  meal_type: 'lunch',
+  meal_type: 2,
   food_desc: '',
   calorie: '',
   protein: '',
@@ -196,19 +222,26 @@ const textForm = reactive({
   carbohydrate: ''
 })
 
+// 后端/数据库的 meal_type 为整数 1 早 / 2 午 / 3 晚 / 4 加餐，分组与提交均按整数进行
+const MEAL_GROUPS = [
+  { type: 1, label: '早餐' },
+  { type: 2, label: '午餐' },
+  { type: 3, label: '晚餐' },
+  { type: 4, label: '加餐' }
+]
+
 const groups = computed(() => {
-  const map = {
-    breakfast: { type: 'breakfast', label: MEAL_TYPE_MAP.breakfast, items: [], total: 0 },
-    lunch: { type: 'lunch', label: MEAL_TYPE_MAP.lunch, items: [], total: 0 },
-    dinner: { type: 'dinner', label: MEAL_TYPE_MAP.dinner, items: [], total: 0 },
-    snack: { type: 'snack', label: MEAL_TYPE_MAP.snack, items: [], total: 0 }
-  }
+  const map = {}
+  MEAL_GROUPS.forEach((g) => {
+    map[g.type] = { type: g.type, label: g.label, items: [], total: 0 }
+  })
   records.value.forEach((r) => {
-    const g = map[r.meal_type] || map.snack
+    const key = Number(r.meal_type)
+    const g = map[key] || map[4]
     g.items.push(r)
     g.total += Number(r.calorie || 0)
   })
-  return Object.values(map)
+  return MEAL_GROUPS.map((g) => map[g.type])
 })
 
 const totalCalorie = computed(() =>
@@ -254,9 +287,10 @@ async function submitText() {
   try {
     await addDiet({
       record_date: recordDate.value,
-      meal_type: textForm.meal_type,
+      meal_type: Number(textForm.meal_type),
       food_desc: textForm.food_desc,
-      input_type: 'text',
+      // 后端 input_type：1 文字 / 2 图片（传字符串会被 pydantic 判为参数校验失败 → 400）
+      input_type: 1,
       calorie: Number(textForm.calorie) || 0,
       protein: Number(textForm.protein) || 0,
       fat: Number(textForm.fat) || 0,
@@ -265,7 +299,7 @@ async function submitText() {
     showToast({ type: 'success', message: '已保存' })
     showText.value = false
     Object.assign(textForm, {
-      meal_type: 'lunch',
+      meal_type: 2,
       food_desc: '',
       calorie: '',
       protein: '',
@@ -287,11 +321,16 @@ async function recognize(file) {
   recognizing.value = true
   showRecognize.value = true
   try {
+    // 手机原图常 >5MB 或为 HEIC/WebP，先在前端压缩并转 JPEG 再上传，避免后端 400
+    const upload = await compressImage(file)
     const fd = new FormData()
-    fd.append('file', file)
+    fd.append('file', upload)
     const res = await recognizeFood(fd)
+    recImageUrl.value = res.image_url || ''
     recognizedList.value = (res.food_list || []).map((f) => ({
       name: f.name || '',
+      // 数量：同一张图里可能有多个相同食物，用它区分（后端 quantity，缺省 1）
+      quantity: String(f.quantity || 1),
       weight: String(f.weight || ''),
       calorie: String(f.calorie || ''),
       protein: String(f.protein || ''),
@@ -305,7 +344,9 @@ async function recognize(file) {
       showToast('未能识别食物，请手动输入')
     }
   } catch (e) {
-    showToast('识别失败，请重试')
+    // 透出后端具体原因（如格式/大小限制），而非笼统的「识别失败」
+    const r = e && e.response
+    showToast((r && r.data && r.data.message) || '识别失败，请重试')
   } finally {
     recognizing.value = false
   }
@@ -313,12 +354,18 @@ async function recognize(file) {
 
 async function saveRecognized() {
   try {
+    let ok = 0
     for (const f of recognizedList.value) {
+      const qty = Math.max(1, Math.round(Number(f.quantity) || 1))
+      // 数据库无「数量」列，把数量并入描述，如「鸡蛋 ×2」，避免多个同名食物信息丢失
+      const desc = qty > 1 ? `${f.name} ×${qty}` : f.name
       await addDiet({
         record_date: recordDate.value,
-        meal_type: recMealType.value,
-        food_desc: f.name,
-        input_type: 'image',
+        meal_type: Number(recMealType.value),
+        food_desc: desc,
+        // 后端 input_type：1 文字 / 2 图片
+        input_type: 2,
+        food_image_path: recImageUrl.value || null,
         calorie: Number(f.calorie) || 0,
         protein: Number(f.protein) || 0,
         fat: Number(f.fat) || 0,
@@ -327,12 +374,18 @@ async function saveRecognized() {
         fiber: Number(f.fiber) || 0,
         sodium: Number(f.sodium) || 0
       })
+      ok += 1
     }
-    showToast({ type: 'success', message: '已保存 ' + recognizedList.value.length + ' 项' })
+    showToast({ type: 'success', message: '已保存 ' + ok + ' 项' })
     showRecognize.value = false
     recognizedList.value = []
+    recImageUrl.value = ''
     loadData()
-  } catch (e) {}
+  } catch (e) {
+    // 原先静默吞异常，导致「保存失败但看不到原因」（例如参数校验 400）
+    const r = e && e.response
+    showToast({ type: 'fail', message: (r && r.data && r.data.message) || '保存失败，请重试' })
+  }
 }
 
 function onEdit(item) {
@@ -353,7 +406,10 @@ async function submitEdit() {
     showToast({ type: 'success', message: '已更新' })
     showEdit.value = false
     loadData()
-  } catch (e) {}
+  } catch (e) {
+    const r = e && e.response
+    showToast({ type: 'fail', message: (r && r.data && r.data.message) || '更新失败，请重试' })
+  }
 }
 
 async function onDelete(item) {
@@ -553,10 +609,58 @@ onMounted(loadData)
   padding: 40px 0;
   color: var(--text-3);
 }
+.rec-count {
+  margin: 4px 0 10px;
+  font-size: 12px;
+  color: var(--text-3);
+}
 .rec-item {
   border-bottom: 1px solid var(--border);
   padding-bottom: 14px;
   margin-bottom: 14px;
+
+  &:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+
+  .rec-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .van-field {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .rec-idx {
+      flex-shrink: 0;
+      width: 26px;
+      font-size: 12px;
+      font-family: @font-mono;
+      color: var(--lime-ink);
+    }
+
+    .rec-del {
+      flex-shrink: 0;
+      width: 30px;
+      height: 30px;
+      border: none;
+      border-radius: @r-sm;
+      background: transparent;
+      color: var(--text-3);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+
+      &:hover {
+        color: var(--red);
+        background: var(--red-soft);
+      }
+    }
+  }
 
   .rec-grid {
     display: grid;

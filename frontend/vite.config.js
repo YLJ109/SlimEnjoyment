@@ -16,6 +16,11 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true
+      },
+      // 识别结果图片存于后端 /uploads，需同样代理，否则列表缩略图 404
+      '/uploads': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
       }
     }
   },

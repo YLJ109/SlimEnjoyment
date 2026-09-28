@@ -11,6 +11,7 @@ from schemas.ai_settings import (
     CapabilityOut,
     PROVIDER_LABELS,
     PROVIDER_DEFAULTS,
+    PROVIDER_FREE_MODELS,
 )
 from services.user_service import (
     update_profile,
@@ -93,7 +94,11 @@ def _cap_out(row, cap: str) -> CapabilityOut:
 @router.get("/ai-settings/providers")
 def ai_settings_providers():
     """返回可选厂商及其默认模型，供前端下拉与厂商切换自动填值。"""
-    return resp(200, "success", {"labels": PROVIDER_LABELS, "defaults": PROVIDER_DEFAULTS})
+    return resp(200, "success", {
+        "labels": PROVIDER_LABELS,
+        "defaults": PROVIDER_DEFAULTS,
+        "free_models": PROVIDER_FREE_MODELS,
+    })
 
 
 @router.get("/ai-settings")

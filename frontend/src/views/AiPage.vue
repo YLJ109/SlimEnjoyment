@@ -170,6 +170,7 @@ import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import AppIcon from '@/components/icons/AppIcon.vue'
 import { aiChat, aiChatStream, recognizeFood } from '@/api/ai'
 import { renderMarkdown } from '@/utils/markdown'
+import { compressImage } from '@/utils/image'
 import { showToast, showLoadingToast, closeToast, showConfirmDialog } from 'vant'
 import { useRouter } from 'vue-router'
 
@@ -451,8 +452,11 @@ async function onImageRead(file) {
   showLoadingToast({ message: '识别中...', forbidClick: true })
   thinking.value = true
   try {
+    // 手机原图往往 >5MB 且可能是 HEIC/WebP，直接上传必被后端拒绝（400）。
+    // 先在前端降采样+转 JPEG，再上传。
+    const upload = await compressImage(item.file)
     const fd = new FormData()
-    fd.append('file', item.file)
+    fd.append('file', upload)
     const res = await recognizeFood(fd)
     const list = res.food_list || []
     const names = list.map((f) => `${f.name} ${Math.round(f.calorie || 0)}kcal`).join('、')
@@ -470,9 +474,10 @@ async function onImageRead(file) {
         ts: Date.now()
       })
     } else {
+      // 透出后端的具体原因（如「图片大小不能超过 5MB」），避免只给一句无信息的兜底文案
       session.messages.push({
         role: 'assistant',
-        content: '图片识别失败，请重试或文字描述。',
+        content: aiErrMsg(e) || '图片识别失败，请重试或文字描述。',
         ts: Date.now()
       })
     }

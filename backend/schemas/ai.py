@@ -4,18 +4,23 @@ from typing import Optional, List, Any
 
 
 class FoodItem(BaseModel):
-    """识别出的单个食物营养信息。"""
+    """识别出的单个食物营养信息。
+
+    数值字段均给默认值：模型偶发漏字段时降级为 0，而非直接 500。
+    """
     model_config = ConfigDict(extra="ignore")
 
     name: str
-    weight: float
-    calorie: float
-    protein: float
-    fat: float
-    carbohydrate: float
-    sugar: float
-    fiber: float
-    sodium: float
+    # 数量（个 / 份）。同一张图里可能有多个相同食物，用它区分，默认 1。
+    quantity: float = 1
+    weight: float = 0
+    calorie: float = 0
+    protein: float = 0
+    fat: float = 0
+    carbohydrate: float = 0
+    sugar: float = 0
+    fiber: float = 0
+    sodium: float = 0
 
 
 class RecognizeResponse(BaseModel):

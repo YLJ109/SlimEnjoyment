@@ -262,6 +262,11 @@
             spellcheck="false"
           />
 
+          <p class="cap-note free-note" v-if="freeModelsOf(c.key).length">
+            <span class="ft-badge" v-if="isFreeModel(c.key)">免费</span>
+            该厂商免费模型：{{ freeModelsOf(c.key).join(' / ') }}
+          </p>
+
           <template v-if="form[c.key].provider === 'custom'">
             <div class="field-label">Base URL（OpenAI 兼容）</div>
             <input
@@ -491,6 +496,7 @@ const showAISet = ref(false)
 const savingAi = ref(false)
 const providerLabels = ref({})
 const providerDefaults = ref({})
+const freeModels = ref({})
 
 const CAPS = [
   { key: 'text', title: '文字生成', desc: '对话、食谱、每日复盘', icon: 'ai' },
@@ -515,6 +521,7 @@ async function ensureProviders() {
     const meta = await getAISettingsProviders()
     providerLabels.value = meta.labels || {}
     providerDefaults.value = meta.defaults || {}
+    freeModels.value = meta.free_models || {}
   } catch (e) {
     /* 读取失败则保留空，前端仅用内置兜底 */
   }
@@ -527,8 +534,11 @@ async function openAISettings() {
     const res = await getAISettings()
     for (const c of CAPS) {
       const s = (res && res[c.key]) || {}
-      form[c.key].provider = s.provider || 'zhipu'
-      form[c.key].model = s.model || ''
+      const prov = s.provider || 'zhipu'
+      form[c.key].provider = prov
+      // 未配置模型时预填该厂商的默认模型（智谱即免费 Flash 系列），保证开箱即用不产生费用
+      form[c.key].model =
+        s.model || (providerDefaults.value[prov] && providerDefaults.value[prov][c.key]) || ''
       form[c.key].base_url = s.base_url || ''
       form[c.key].api_key = '' // 不回填明文，留空表示保持原值
       masked[c.key].has_key = !!s.has_key
@@ -554,6 +564,18 @@ function defaultModelHint(capKey) {
   const p = form[capKey].provider
   const def = providerDefaults.value[p] && providerDefaults.value[p][capKey]
   return def ? `默认：${def}` : '模型名（如 glm-4-flash）'
+}
+
+// 各厂商已确认免费的模型清单（由后端 /ai-settings/providers 下发）
+function freeModelsOf(capKey) {
+  const p = form[capKey].provider
+  return freeModels.value[p] || []
+}
+
+// 当前填写的模型是否属于免费清单（用于显示「免费」徽标）
+function isFreeModel(capKey) {
+  const m = (form[capKey].model || '').trim()
+  return !!m && freeModelsOf(capKey).includes(m)
 }
 
 async function saveAISettings() {
@@ -1089,5 +1111,22 @@ onMounted(async () => {
   font-size: 11px;
   line-height: 1.5;
   color: var(--text-3);
+}
+
+/* 免费模型提示 */
+.free-note {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ft-badge {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #0b0d0c;
+  background: var(--brand, #c6f24e);
 }
 </style>

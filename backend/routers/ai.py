@@ -2,6 +2,7 @@
 import os
 import uuid
 import asyncio
+import logging
 from fastapi import APIRouter, Depends, File, UploadFile, Query
 from sqlalchemy.orm import Session
 from datetime import date
@@ -23,6 +24,7 @@ from database.models import DietRecord, AiDietPlan
 import json
 
 router = APIRouter(prefix="/api/v1/ai", tags=["AI"])
+logger = logging.getLogger("ai.recognize")
 
 
 def _cfg(db, user_id: int, cap: str, default_model: str) -> dict:
@@ -69,12 +71,22 @@ async def recognize_food(
     """上传食物图片，识别食物并估算营养。"""
     content = await file.read()
     if len(content) > 5 * 1024 * 1024:
+        logger.warning(
+            "recognize-food 拒绝：图片 %d 字节超限（user=%s, filename=%s）",
+            len(content), user_id, file.filename,
+        )
         raise AppException(400, "图片大小不能超过 5MB")
 
     # 校验真实文件类型（magic bytes），仅依赖扩展名可被改名绕过
     mime = _sniff_image_mime(content)
     if mime is None:
-        raise AppException(400, "仅支持 jpg / png 格式图片")
+        logger.warning(
+            "recognize-food 拒绝：非 jpg/png（user=%s, filename=%s, head=%r）",
+            user_id, file.filename, content[:12],
+        )
+        raise AppException(
+            400, "图片格式不支持，请上传 JPG / PNG 图片（HEIC / WebP 请先另存为 JPG）"
+        )
 
     # 文件落盘 + 模型推理为同步阻塞操作，交给线程池执行，保护事件循环吞吐
     loop = asyncio.get_event_loop()

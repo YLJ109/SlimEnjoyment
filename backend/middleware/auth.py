@@ -32,12 +32,15 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if request.method == "OPTIONS":
             return await call_next(request)
 
-        # 公开路径 / 文档路径直接放行
+        # 公开路径 / 文档路径 / 静态图片直接放行。
+        # 注意：/uploads 下是识别结果图片，浏览器 <img> 标签不会携带 Authorization 头，
+        # 若纳入鉴权则图片必定 401 裂图；文件名是随机 UUID，不可枚举，故公开。
         if (
             path in PUBLIC_PATHS
             or path.startswith("/docs")
             or path.startswith("/redoc")
             or path.startswith("/openapi.json")
+            or path.startswith("/uploads")
         ):
             return await call_next(request)
 

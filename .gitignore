@@ -11,6 +11,9 @@ backend/diet.db
 *.db
 *.sqlite
 *.sqlite3
+*.db.bak-*
+*.db-wal
+*.db-shm
 backend/uploads/*
 !backend/uploads/.gitkeep
 backend/.env

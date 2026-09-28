@@ -25,10 +25,15 @@ from services.llm_dispatch import complete, stream_complete
 # ---------- 提示词（必须原样使用）----------
 
 RECOGNIZE_PROMPT = (
-    "你是专业营养师，识别图片中的食物，估算每种食物的分量（克），计算对应的营养数据。"
+    "你是专业营养师，识别图片中的食物，估算每种食物的份量与数量，计算对应的营养数据。"
     "必须严格返回JSON格式，不要任何多余文字，格式如下："
-    "{\"food_list\":[{\"name\":\"食物名称\",\"weight\":100,\"calorie\":110,\"protein\":3.5,"
-    "\"fat\":0.5,\"carbohydrate\":25,\"sugar\":2,\"fiber\":1.2,\"sodium\":5}],\"total_calorie\":总热量}。"
+    "{\"food_list\":[{\"name\":\"食物名称\",\"quantity\":1,\"weight\":100,\"calorie\":110,"
+    "\"protein\":3.5,\"fat\":0.5,\"carbohydrate\":25,\"sugar\":2,\"fiber\":1.2,\"sodium\":5}],"
+    "\"total_calorie\":总热量}。"
+    "关于 quantity：表示数量（个/只/片/份），无法判断时填 1；"
+    "若图中同一种食物有多个（例如 3 个鸡蛋），必须把数量写进 quantity，且 weight/热量等为该条的总量，"
+    "不要因为同名就合并计为 1。"
+    "同类食物但做法不同（如煎蛋与煮蛋）应各自单独成条。"
     "注意：分量估算要符合中国居民日常饮食实际，营养数据准确。"
 )
 

@@ -12,7 +12,7 @@
         <span class="cal num">{{ Math.round(item.calorie || 0) }} kcal</span>
         <span v-if="item.protein" class="nutri num">蛋白 {{ Math.round(item.protein) }}g</span>
         <span v-if="item.input_type" class="tag">{{
-          item.input_type === 'image' ? '识别' : '手动'
+          Number(item.input_type) === 2 ? '识别' : '手动'
         }}</span>
       </div>
     </div>

@@ -184,7 +184,7 @@ import AppIcon from '@/components/icons/AppIcon.vue'
 import { listDiet, addDiet, updateDiet, deleteDiet } from '@/api/diet'
 import { recognizeFood } from '@/api/ai'
 import { showToast, showLoadingToast, closeToast, showConfirmDialog } from 'vant'
-import { formatDate, today } from '@/utils/format'
+import { formatDate, today, roundNum } from '@/utils/format'
 import { compressImage } from '@/utils/image'
 
 const recordDate = ref(today())
@@ -241,20 +241,21 @@ const groups = computed(() => {
     g.items.push(r)
     g.total += Number(r.calorie || 0)
   })
-  return MEAL_GROUPS.map((g) => map[g.type])
+  return MEAL_GROUPS.map((g) => ({ ...map[g.type], total: roundNum(map[g.type].total, 1) }))
 })
 
+// 浮点累加会出现 47.70000000000001 这类尾数，统一 roundNum 后再展示
 const totalCalorie = computed(() =>
-  records.value.reduce((s, r) => s + Number(r.calorie || 0), 0)
+  roundNum(records.value.reduce((s, r) => s + Number(r.calorie || 0), 0), 1)
 )
 const totalProtein = computed(() =>
-  records.value.reduce((s, r) => s + Number(r.protein || 0), 0)
+  roundNum(records.value.reduce((s, r) => s + Number(r.protein || 0), 0), 1)
 )
 const totalFat = computed(() =>
-  records.value.reduce((s, r) => s + Number(r.fat || 0), 0)
+  roundNum(records.value.reduce((s, r) => s + Number(r.fat || 0), 0), 1)
 )
 const totalCarb = computed(() =>
-  records.value.reduce((s, r) => s + Number(r.carbohydrate || 0), 0)
+  roundNum(records.value.reduce((s, r) => s + Number(r.carbohydrate || 0), 0), 1)
 )
 
 async function loadData() {

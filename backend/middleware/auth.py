@@ -5,6 +5,10 @@
   解析出 user_id 存入 request.state.user_id；失败或缺失返回 401。
 - get_current_user_id：FastAPI 依赖，从 request.state.user_id 读取当前用户，
   供各 router 使用。
+
+鉴权范围：**仅业务接口 `/api/**`**。其余路径（SPA 静态资源与前端路由、/uploads
+图片、/docs 文档、/health 探活）一律放行——否则浏览器刷新 `/diet` 这类前端路由
+会被 401 拦住，且 `<img>` 无法携带 Authorization 头导致图片必然裂图。
 """
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request
@@ -12,12 +16,10 @@ from fastapi.responses import JSONResponse
 
 from utils.security import decode_access_token
 
-# 无需鉴白的公开路径（注册、登录、健康检查、文档）
+# 无需鉴权的业务接口（注册、登录）
 PUBLIC_PATHS = {
     "/api/v1/auth/register",
     "/api/v1/auth/login",
-    "/health",
-    "/",
 }
 
 
@@ -32,16 +34,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if request.method == "OPTIONS":
             return await call_next(request)
 
-        # 公开路径 / 文档路径 / 静态图片直接放行。
-        # 注意：/uploads 下是识别结果图片，浏览器 <img> 标签不会携带 Authorization 头，
-        # 若纳入鉴权则图片必定 401 裂图；文件名是随机 UUID，不可枚举，故公开。
-        if (
-            path in PUBLIC_PATHS
-            or path.startswith("/docs")
-            or path.startswith("/redoc")
-            or path.startswith("/openapi.json")
-            or path.startswith("/uploads")
-        ):
+        # 非 /api 路径（SPA 资源、前端路由、uploads、docs、health）直接放行
+        if not path.startswith("/api/"):
+            return await call_next(request)
+
+        # 公开接口（注册 / 登录）放行
+        if path in PUBLIC_PATHS:
             return await call_next(request)
 
         # 读取 Authorization 头

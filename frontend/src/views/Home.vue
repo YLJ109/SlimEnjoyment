@@ -170,7 +170,7 @@ import { generatePlan, getPlan } from '@/api/ai'
 import { addWeight } from '@/api/weight'
 import { addWater, todayWater } from '@/api/water'
 import { showToast, showLoadingToast, closeToast } from 'vant'
-import { formatDate, today, weekdayCN } from '@/utils/format'
+import { formatDate, today, weekdayCN, roundNum } from '@/utils/format'
 import { MEAL_TYPE_MAP } from '@/utils/common'
 
 const router = useRouter()
@@ -199,18 +199,18 @@ const todayData = reactive({
 })
 const recommend = ref(0)
 
-// 营养素进度
+// 营养素进度（保留 1 位小数，与「饮食记录」页的今日汇总保持同一取整口径）
 const nutri = computed(() => {
   const rec = recommend.value || 1500
   const targets = {
-    protein: Math.round((rec * 0.25) / 4),
-    fat: Math.round((rec * 0.25) / 9),
-    carbohydrate: Math.round((rec * 0.5) / 4)
+    protein: roundNum((rec * 0.25) / 4, 1),
+    fat: roundNum((rec * 0.25) / 9, 1),
+    carbohydrate: roundNum((rec * 0.5) / 4, 1)
   }
   const make = (key, label, color, cur) => {
     const target = targets[key] || 1
-    const percent = Math.min(Math.round((cur / target) * 100), 100)
-    return { key, label, color, cur: Math.round(cur || 0), target, percent }
+    const percent = Math.min(Math.round((Number(cur || 0) / target) * 100), 100)
+    return { key, label, color, cur: roundNum(cur || 0, 1), target, percent }
   }
   return [
     make('protein', '蛋白质', 'var(--lime)', todayData.total_protein),
@@ -228,7 +228,7 @@ const mealList = computed(() => [
   { type: 'dinner', label: MEAL_TYPE_MAP.dinner, items: plan.dinner, total: sumCal(plan.dinner) }
 ])
 function sumCal(arr) {
-  return (arr || []).reduce((s, x) => s + Number(x.calorie || 0), 0)
+  return roundNum((arr || []).reduce((s, x) => s + Number(x.calorie || 0), 0), 1)
 }
 const hasPlan = computed(
   () => plan.breakfast.length > 0 || plan.lunch.length > 0 || plan.dinner.length > 0

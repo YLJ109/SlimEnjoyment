@@ -22,6 +22,7 @@ frontend/dist/
 dist/
 .vite/
 frontend/package-lock.json
+*.timestamp-*.mjs
 frontend/.env
 
 # 密钥 / 本地配置（通用，绝不上传）
@@ -35,9 +36,11 @@ aipage.png
 mineconf.png
 mineconf.yaml
 *.log
+.shots/
 
-# WorkBuddy 项目记忆
+# WorkBuddy 项目记忆 / 测试工具产物
 .workbuddy/
+.playwright-cli/
 
 # Editor / OS
 .DS_Store
